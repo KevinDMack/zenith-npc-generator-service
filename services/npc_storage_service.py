@@ -3,111 +3,127 @@ import json
 import logging
 from datetime import datetime
 from typing import List
+from pymongo import MongoClient
+from pymongo.collection import Collection
 from models.npc import NPC
 
 
 class NPCStorageService:
-    """Service for storing NPCs to local JSON files"""
+    """Service for storing NPCs to MongoDB database"""
     
-    def __init__(self, storage_dir: str = "citizens"):
-        self.storage_dir = storage_dir
+    def __init__(self, connection_string: str = None):
         self.logger = logging.getLogger(__name__)
         
-        # Ensure the storage directory exists
-        os.makedirs(self.storage_dir, exist_ok=True)
-
-    def save_npc(self, npc: NPC) -> str:
-        """Save a single NPC to a JSON file"""
+        # Get MongoDB connection string from environment or parameter
+        self.connection_string = connection_string or os.getenv('MONGODB_CONNECTION_STRING', 'mongodb://localhost:27017/zenith_npc_db')
         
         try:
-            # Generate filename with timestamp and NPC name
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            safe_name = "".join(c for c in npc.Name if c.isalnum() or c in (' ', '-', '_')).rstrip()
-            safe_name = safe_name.replace(' ', '_')
-            filename = f"{timestamp}_{safe_name}.json"
-            filepath = os.path.join(self.storage_dir, filename)
+            # Initialize MongoDB client and collection
+            self.client = MongoClient(self.connection_string)
+            self.db = self.client.get_default_database()
+            self.collection: Collection = self.db["NPCs"]
             
-            # Convert NPC to dict and save
+            # Test connection
+            self.client.admin.command('ping')
+            self.logger.info(f"Connected to MongoDB: {self.connection_string}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to connect to MongoDB: {e}")
+            raise
+
+    def save_npc(self, npc: NPC) -> str:
+        """Save a single NPC to MongoDB"""
+        
+        try:
+            # Convert NPC to dict and add metadata
             npc_data = npc.model_dump()
+            npc_data['_created_at'] = datetime.now()
+            npc_data['_type'] = 'individual'
             
-            with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(npc_data, f, indent=2, ensure_ascii=False)
+            # Insert the NPC
+            result = self.collection.insert_one(npc_data)
+            npc_id = str(result.inserted_id)
             
-            self.logger.info(f"Saved NPC {npc.Name} to {filepath}")
-            return filepath
+            self.logger.info(f"Saved NPC {npc.Name} with ID {npc_id}")
+            return npc_id
             
         except Exception as e:
             self.logger.error(f"Failed to save NPC {npc.Name}: {e}")
             raise
 
     def save_npcs_batch(self, npcs: List[NPC]) -> List[str]:
-        """Save multiple NPCs to individual JSON files"""
+        """Save multiple NPCs to individual MongoDB documents"""
         
-        saved_files = []
+        saved_ids = []
         for npc in npcs:
             try:
-                filepath = self.save_npc(npc)
-                saved_files.append(filepath)
+                npc_id = self.save_npc(npc)
+                saved_ids.append(npc_id)
             except Exception as e:
                 self.logger.error(f"Failed to save NPC in batch: {e}")
                 continue
         
-        return saved_files
+        return saved_ids
 
     def save_npcs_collection(self, npcs: List[NPC]) -> str:
-        """Save multiple NPCs to a single collection JSON file"""
+        """Save multiple NPCs as a single collection document"""
         
         try:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"npc_collection_{timestamp}.json"
-            filepath = os.path.join(self.storage_dir, filename)
-            
-            # Convert all NPCs to dict format
-            npcs_data = {
+            # Create collection document structure
+            collection_data = {
+                "_created_at": datetime.now(),
+                "_type": "collection",
                 "generated_at": datetime.now().isoformat(),
                 "count": len(npcs),
                 "npcs": [npc.model_dump() for npc in npcs]
             }
             
-            with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(npcs_data, f, indent=2, ensure_ascii=False)
+            # Insert the collection
+            result = self.collection.insert_one(collection_data)
+            collection_id = str(result.inserted_id)
             
-            self.logger.info(f"Saved {len(npcs)} NPCs to collection file {filepath}")
-            return filepath
+            self.logger.info(f"Saved {len(npcs)} NPCs as collection with ID {collection_id}")
+            return collection_id
             
         except Exception as e:
             self.logger.error(f"Failed to save NPC collection: {e}")
             raise
 
     def get_all_npcs(self) -> List[dict]:
-        """Load all NPCs from the storage directory"""
+        """Load all individual NPCs from MongoDB"""
         
         npcs = []
         try:
-            for filename in os.listdir(self.storage_dir):
-                if filename.endswith('.json') and not filename.startswith('npc_collection_'):
-                    filepath = os.path.join(self.storage_dir, filename)
-                    with open(filepath, 'r', encoding='utf-8') as f:
-                        npc_data = json.load(f)
-                        npcs.append(npc_data)
+            # Query for individual NPCs only (not collections)
+            cursor = self.collection.find({"_type": "individual"})
+            
+            for doc in cursor:
+                # Remove MongoDB internal fields for API response
+                doc.pop('_id', None)
+                doc.pop('_created_at', None) 
+                doc.pop('_type', None)
+                npcs.append(doc)
+                
         except Exception as e:
             self.logger.error(f"Failed to load NPCs: {e}")
         
         return npcs
 
     def get_storage_stats(self) -> dict:
-        """Get statistics about stored NPCs"""
+        """Get statistics about stored NPCs in MongoDB"""
         
         try:
-            files = [f for f in os.listdir(self.storage_dir) if f.endswith('.json')]
-            individual_files = [f for f in files if not f.startswith('npc_collection_')]
-            collection_files = [f for f in files if f.startswith('npc_collection_')]
+            # Count different types of documents
+            total_docs = self.collection.count_documents({})
+            individual_npcs = self.collection.count_documents({"_type": "individual"})
+            collection_docs = self.collection.count_documents({"_type": "collection"})
             
             return {
-                "total_files": len(files),
-                "individual_npcs": len(individual_files),
-                "collection_files": len(collection_files),
-                "storage_directory": self.storage_dir
+                "total_documents": total_docs,
+                "individual_npcs": individual_npcs,
+                "collection_documents": collection_docs,
+                "database": self.db.name,
+                "collection": self.collection.name
             }
         except Exception as e:
             self.logger.error(f"Failed to get storage stats: {e}")

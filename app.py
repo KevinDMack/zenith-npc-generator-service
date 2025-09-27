@@ -55,13 +55,13 @@ def generate_single_npc():
         if not npc:
             return jsonify({"error": "Failed to generate NPC"}), 500
         
-        # Save to local storage
-        filepath = storage_service.save_npc(npc)
+        # Save to MongoDB
+        npc_id = storage_service.save_npc(npc)
         
         return jsonify({
             "success": True,
             "npc": npc.model_dump(),
-            "saved_to": filepath
+            "saved_to": npc_id
         })
         
     except Exception as e:
@@ -89,16 +89,16 @@ def generate_multiple_npcs():
             return jsonify({"error": "Failed to generate any NPCs"}), 500
         
         # Save NPCs individually and as a collection
-        individual_files = storage_service.save_npcs_batch(npcs)
-        collection_file = storage_service.save_npcs_collection(npcs)
+        individual_ids = storage_service.save_npcs_batch(npcs)
+        collection_id = storage_service.save_npcs_collection(npcs)
         
         return jsonify({
             "success": True,
             "generated_count": len(npcs),
             "requested_count": request_model.count,
             "npcs": [npc.model_dump() for npc in npcs],
-            "individual_files": individual_files,
-            "collection_file": collection_file
+            "individual_files": individual_ids,
+            "collection_file": collection_id
         })
         
     except Exception as e:
