@@ -1,6 +1,6 @@
 # Zenith NPC Generator Service
 
-A Python microservice that leverages Azure OpenAI to generate unique NPCs (Non-Player Characters) for fantasy and sci-fi settings. Each generated NPC includes detailed attributes and is saved as JSON files in a local "citizens" directory.
+A Python microservice that leverages Azure OpenAI to generate unique NPCs (Non-Player Characters) for fantasy and sci-fi settings. Each generated NPC includes detailed attributes and is stored in a MongoDB database in the "NPCs" collection.
 
 ## 🚀 Quick Start
 
@@ -8,13 +8,14 @@ A Python microservice that leverages Azure OpenAI to generate unique NPCs (Non-P
 - Python 3.8+
 - Azure OpenAI service with a deployed model (GPT-3.5-turbo or GPT-4 recommended)
 - Azure OpenAI API key and endpoint
+- MongoDB database (local or cloud instance)
 
 ### Getting Started in 5 Steps
 
-1. **Set up your Azure OpenAI credentials:**
+1. **Set up your Azure OpenAI credentials and MongoDB connection:**
    ```bash
    cp .env.example .env
-   # Edit .env with your Azure OpenAI details
+   # Edit .env with your Azure OpenAI details and MongoDB connection string
    ```
 
 2. **Install dependencies:**
@@ -40,7 +41,7 @@ A Python microservice that leverages Azure OpenAI to generate unique NPCs (Non-P
      -d '{}'
    ```
 
-Your NPCs will be saved as JSON files in the `citizens/` directory! 🎭
+Your NPCs will be saved to MongoDB in the "NPCs" collection! 🎭
 
 ## 🐳 Docker Deployment
 
@@ -195,7 +196,7 @@ clean    # Clean up resources
 
 - Generate single or multiple NPCs using Azure OpenAI
 - Customizable generation parameters (species, district, age range)
-- Automatic JSON file storage in the "citizens" directory
+- Automatic MongoDB storage in the "NPCs" collection
 - RESTful API endpoints
 - Comprehensive logging and error handling
 - Health check and storage statistics endpoints
@@ -316,16 +317,19 @@ curl -X POST http://localhost:5000/generate-npcs \
   }'
 ```
 
-## File Storage
+## MongoDB Storage
 
-Generated NPCs are automatically saved to the `citizens/` directory in two formats:
+Generated NPCs are automatically saved to MongoDB in the "NPCs" collection in two types:
 
-1. **Individual files**: `YYYYMMDD_HHMMSS_NPC_Name.json`
-2. **Collection files**: `npc_collection_YYYYMMDD_HHMMSS.json` (when generating multiple NPCs)
+1. **Individual NPCs**: Each NPC is saved as a separate document with `"_type": "individual"`
+2. **Collection documents**: When generating multiple NPCs, they can also be saved as a single collection document with `"_type": "collection"`
 
-### Example NPC JSON Output
+### Example NPC Document Structure
 ```json
 {
+  "_id": "507f1f77bcf86cd799439011",
+  "_type": "individual",
+  "_created_at": "2024-01-01T10:00:00.000Z",
   "Name": "Eldara Moonwhisper",
   "Age": 127,
   "Species": "Elf",
@@ -342,14 +346,13 @@ zenith-npc-generator-service/
 ├── app.py                          # Main Flask application
 ├── requirements.txt                # Python dependencies
 ├── .env.example                    # Environment variables template
-├── citizens/                       # Directory for generated NPC files
 ├── models/
 │   ├── __init__.py
 │   └── npc.py                      # NPC data models
 └── services/
     ├── __init__.py
     ├── azure_openai_service.py     # Azure OpenAI integration
-    └── npc_storage_service.py      # File storage service
+    └── npc_storage_service.py      # MongoDB storage service
 ```
 
 ## Configuration
@@ -360,6 +363,7 @@ zenith-npc-generator-service/
 - `AZURE_OPENAI_API_KEY`: Your Azure OpenAI API key
 - `AZURE_OPENAI_API_VERSION`: API version (default: 2024-02-15-preview)
 - `AZURE_OPENAI_DEPLOYMENT_NAME`: Name of your deployed model
+- `MONGODB_CONNECTION_STRING`: MongoDB connection string (default: mongodb://localhost:27017/zenith_npc_db)
 - `FLASK_ENV`: Flask environment (development/production)
 - `FLASK_DEBUG`: Enable Flask debug mode (True/False)
 
@@ -368,14 +372,14 @@ zenith-npc-generator-service/
 The service includes comprehensive error handling:
 - Invalid JSON responses from OpenAI are caught and logged
 - Missing environment variables are validated on startup
-- File storage errors are handled gracefully
+- MongoDB connection and storage errors are handled gracefully
 - All endpoints return appropriate HTTP status codes
 
 ## Logging
 
 The service logs important events including:
 - NPC generation success/failure
-- File storage operations
+- MongoDB storage operations
 - API request errors
 - Service startup information
 
