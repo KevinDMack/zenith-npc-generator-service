@@ -1,8 +1,24 @@
 # Zenith NPC Generator Service
 
-A Python microservice that leverages Azure OpenAI to generate unique NPCs (Non-Player Characters) for fantasy and sci-fi settings. Each generated NPC includes detailed attributes and is stored in a MongoDB database in the "NPCs" collection.
+A Python microservice that leverages Azure OpenAI to generate unique NPCs (Non-Player Characters) for fantasy and sci-fi settings. Each generated NPC includes detailed attributes and is stored in a MongoDB database.
+
+**🆕 NEW**: This service now supports **Dapr-based topic communication** for cloud-native deployments alongside the original HTTP endpoints.
 
 ## 🚀 Quick Start
+
+### Choose Your Deployment Mode
+
+#### 🌐 HTTP Mode (Legacy)
+Traditional REST API endpoints:
+```bash
+python app.py
+```
+
+#### ☁️ Dapr Mode (Cloud-Native)  
+Topic-based communication with Dapr:
+```bash
+./start_dapr.sh
+```
 
 ### Prerequisites
 - Python 3.8+
@@ -252,7 +268,7 @@ Each generated NPC includes the following attributes:
 
 The service will start on `http://localhost:5000`
 
-## API Endpoints
+## API Endpoints (HTTP Mode)
 
 ### Health Check
 ```
@@ -296,6 +312,21 @@ Returns all NPCs stored in the citizens directory.
 GET /storage-stats
 ```
 Returns statistics about stored NPC files.
+
+## 📡 Dapr Topic Communication (Cloud-Native Mode)
+
+### Request Topic: `npc-generation-request`
+Publish `GenerateNPCTopicMessage` (Protocol Buffer):
+- `request_id`: Unique identifier
+- `request`: NPCGenerationRequest with parameters
+- `response_topic`: Where to send the response
+
+### Response: Dynamic topic per request
+Receive `NPCGenerationTopicResponse` (Protocol Buffer):
+- `request_id`: Matching identifier
+- `response`: NPCGenerationResponse with generated NPCs
+
+📖 **For detailed Dapr usage, see [DAPR.md](DAPR.md)**
 
 ## Example Usage
 
@@ -343,16 +374,29 @@ Generated NPCs are automatically saved to MongoDB in the "NPCs" collection in tw
 
 ```
 zenith-npc-generator-service/
-├── app.py                          # Main Flask application
+├── app.py                          # Main Flask application (HTTP mode)
+├── dapr_app.py                     # Dapr-enabled application (cloud-native mode)
 ├── requirements.txt                # Python dependencies
 ├── .env.example                    # Environment variables template
 ├── models/
 │   ├── __init__.py
-│   └── npc.py                      # NPC data models
-└── services/
-    ├── __init__.py
-    ├── azure_openai_service.py     # Azure OpenAI integration
-    └── npc_storage_service.py      # MongoDB storage service
+│   └── npc.py                      # Pydantic NPC data models (legacy)
+├── protos/
+│   └── npc.proto                   # Protocol Buffer definitions (new)
+├── npc_pb2.py                      # Generated protobuf classes (auto-generated)
+├── services/
+│   ├── __init__.py
+│   ├── azure_openai_service.py     # Azure OpenAI integration
+│   ├── npc_storage_service.py      # MongoDB storage service (Pydantic models)
+│   └── npc_storage_service_pb.py   # MongoDB storage service (protobuf compatible)
+├── dapr/
+│   └── components/
+│       └── pubsub.yaml             # Dapr PubSub configuration
+├── start_dapr.sh                   # Dapr startup script
+├── test_service.py                 # HTTP endpoint tests
+├── test_both_services.py           # Tests for both HTTP and Dapr modes
+├── dapr_client_example.py          # Example Dapr client
+└── DAPR.md                         # Dapr integration documentation
 ```
 
 ## Configuration

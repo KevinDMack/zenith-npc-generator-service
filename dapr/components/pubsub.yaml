@@ -1,0 +1,21 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: pubsub
+spec:
+  type: pubsub.redis
+  version: v1
+  metadata:
+  - name: redisHost
+    value: localhost:6379
+  - name: redisPassword
+    value: ""
+---
+apiVersion: dapr.io/v1alpha1
+kind: Subscription
+metadata:
+  name: npc-generation-subscription
+spec:
+  pubsubname: pubsub
+  topic: npc-generation-request
+  route: /npc-generation-request

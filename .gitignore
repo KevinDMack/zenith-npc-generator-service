@@ -57,3 +57,7 @@ logs/
 
 # Docker
 .dockerignore
+
+# Generated protobuf files (can be regenerated from .proto files)
+*_pb2.py
+*_pb2_grpc.py

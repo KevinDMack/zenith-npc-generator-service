@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package zenith.npc.v1;
+
+option go_package = "github.com/KevinDMack/zenith-npc-generator-service/protos/npc/v1;npcv1";
+
+// NPC represents a non-player character in the Zenith world
+message NPC {
+    string name = 1;
+    int32 age = 2;
+    string species = 3;
+    string physical_description = 4;
+    string personality_description = 5;
+    string resident_district = 6;
+}
+
+// NPCGenerationRequest represents a request to generate one or more NPCs
+message NPCGenerationRequest {
+    int32 count = 1;                        // Number of NPCs to generate (default: 1)
+    optional string species_preference = 2;  // Optional species preference
+    optional string district_preference = 3; // Optional district preference  
+    optional string age_range = 4;          // Optional age range (e.g., "25-35")
+}
+
+// NPCGenerationResponse represents the response from NPC generation
+message NPCGenerationResponse {
+    bool success = 1;
+    repeated NPC npcs = 2;
+    int32 generated_count = 3;
+    int32 requested_count = 4;
+    repeated string individual_files = 5;    // IDs of individual NPC documents
+    optional string collection_file = 6;     // ID of collection document (for multiple NPCs)
+    optional string error = 7;              // Error message if success = false
+}
+
+// Topic message for single NPC generation
+message GenerateNPCTopicMessage {
+    string request_id = 1;                  // Unique request identifier
+    NPCGenerationRequest request = 2;       // The generation request
+    string response_topic = 3;              // Topic to send response to
+}
+
+// Topic message for NPC generation response
+message NPCGenerationTopicResponse {
+    string request_id = 1;                  // Matching request identifier
+    NPCGenerationResponse response = 2;     // The generation response
+}
